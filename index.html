@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>TaskFlow</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+          rel="stylesheet">
+
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+        <link rel="stylesheet"
+            href="css/dashboard.css">
+
+        <link rel="stylesheet" href="css/modal.css">
+
+    <link rel="stylesheet"
+          href="css/toast.css">
+
+</head>
+
+<body>
+    <!-- SIDEBAR OVERLAY -->
+    <div id="sidebarOverlay" class="sidebar-overlay"></div>
+
+    <div class="app-layout">
+
+    <!-- SIDEBAR -->
+    <aside id="sidebar" class="sidebar">
+
+        <div class="logo">
+            <img src="assets/images/taskflow-logo.png" alt="TaskFlow Logo">
+        </div>
+
+        <nav class="sidebar-menu" aria-label="Main Navigation">
+
+            <a href="#" class="menu-item active" aria-current="page">
+                <span class="icon"><i class="fa-solid fa-house"></i></span>
+                <span class="label">Dashboard</span>
+            </a>
+
+            <a href="#" class="menu-item">
+                <span class="icon"><i class="fa-solid fa-list-check"></i></span>
+                <span class="label">Tasks</span>
+            </a>
+
+            <a href="#" class="menu-item">
+                <span class="icon"><i class="fa-solid fa-chart-line"></i></span>
+                <span class="label">Analytics</span>
+            </a>
+
+            <a href="#" class="menu-item">
+                <span class="icon"><i class="fa-solid fa-trophy"></i></span>
+                <span class="label">Rewards</span>
+            </a>
+
+            <a href="#" class="menu-item">
+                <span class="icon"><i class="fa-solid fa-gear"></i></span>
+                <span class="label">Settings</span>
+            </a>
+
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="profile-card">
+                <div class="profile-avatar">MR</div>
+                <div class="profile-info">
+                    <span class="profile-name">Mark Russell</span>
+                    <span class="profile-role">Admin</span>
+                </div>
+            </div>
+
+            <button type="button" class="menu-item logout-button" onclick="logout()">
+                <span class="icon"><i class="fa-solid fa-right-from-bracket"></i></span>
+                <span class="label">Logout</span>
+            </button>
+        </div>
+
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+    
+
+<div class="container">
+
+    <!-- ==========================================
+         HEADER
+    ========================================== -->
+
+    <div class="header">
+        <div class="header-top">
+            <button id="mobileMenuBtn" class="mobile-toggle-btn" aria-label="Toggle Menu">
+                <i class="fa-solid fa-bars"></i>
+            </button>
+            <h1>DASHBOARD</h1>
+        </div>
+        <p class="header-subtitle">Organize. Prioritize. Get things done.</p>
+    </div>
+
+    <!-- ==========================================
+         SUMMARY CARDS
+    ========================================== -->
+
+    <div class="cards">
+
+        <div class="card kpi-card">
+            <div class="kpi-icon blue"><i class="fa-solid fa-list"></i></div>
+            <div class="kpi-content">
+                <h3>Total Tasks</h3>
+                <h2 id="totalTasks">0</h2>
+            </div>
+        </div>
+
+        <div class="card kpi-card">
+            <div class="kpi-icon orange"><i class="fa-solid fa-spinner"></i></div>
+            <div class="kpi-content">
+                <h3>Pending</h3>
+                <h2 id="pendingTasks">0</h2>
+            </div>
+        </div>
+
+        <div class="card kpi-card">
+            <div class="kpi-icon green"><i class="fa-solid fa-check-double"></i></div>
+            <div class="kpi-content">
+                <h3>Completed</h3>
+                <h2 id="completedTasks">0</h2>
+            </div>
+        </div>
+
+        <div id="overdueCard" class="card kpi-card">
+            <div class="kpi-icon red"><i class="fa-solid fa-circle-exclamation"></i></div>
+            <div class="kpi-content">
+                <h3>Overdue</h3>
+                <h2 id="overdueTasks">0</h2>
+            </div>
+        </div>
+
+        <div class="card kpi-card">
+            <div class="kpi-icon purple"><i class="fa-solid fa-calendar-day"></i></div>
+            <div class="kpi-content">
+                <h3>Due Today</h3>
+                <h2 id="dueToday">0</h2>
+            </div>
+        </div>
+
+        <div class="card kpi-card">
+            <div class="kpi-icon cyan"><i class="fa-solid fa-clock"></i></div>
+            <div class="kpi-content">
+                <h3>Upcoming</h3>
+                <h2 id="upcomingTasks">0</h2>
+            </div>
+        </div>
+
+        <div class="card kpi-card">
+            <div class="kpi-icon yellow"><i class="fa-solid fa-chart-pie"></i></div>
+            <div class="kpi-content">
+                <h3>Done %</h3>
+                <h2 id="completionRate">0%</h2>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ==========================================
+         ANALYTICS CHARTS
+    ========================================== -->
+
+    <div class="cards analytics-row">
+
+        <div class="card">
+            <h3>Task Status Overview</h3>
+            <canvas id="statusChart"></canvas>
+        </div>
+
+        <div class="card">
+            <h3>Priority Distribution</h3>
+            <canvas id="priorityChart"></canvas>
+        </div>
+
+    </div>
+
+    <!-- ==========================================
+         TASK FORM
+    ========================================== -->
+
+    <div class="section">
+
+        <div class="section-title">
+            Add New Task
+        </div>
+
+        <div class="form-grid">
+
+            <input id="title"
+                   placeholder="Task Title">
+
+            <input id="dueDate"
+                   type="date">
+
+            <select id="priority">
+                <option>Low</option>
+                <option selected>Medium</option>
+                <option>High</option>
+            </select>
+
+            <select id="status">
+                <option selected>Pending</option>
+                <option>Completed</option>
+            </select>
+
+            <input id="estimatedHours"
+                   type="number"
+                   placeholder="Estimated Hours">
+
+            <input id="reward"
+                   placeholder="Reward For Completion">
+
+            <button class="btn-primary"
+                    onclick="addTask()">
+                Add Task
+            </button>
+
+        </div>
+
+    </div>
+
+    <!-- ==========================================
+         FILTERS SECTION
+    ========================================== -->
+    <div class="section filters-container">
+        <div class="filter-group">
+            <span class="filter-label">Status:</span>
+            <div class="filter-buttons" id="statusFilters">
+                <button class="filter-btn active" data-filter="status" data-value="All">All</button>
+                <button class="filter-btn" data-filter="status" data-value="Pending">Pending</button>
+                <button class="filter-btn" data-filter="status" data-value="Completed">Completed</button>
+            </div>
+        </div>
+
+        <div class="filter-group">
+            <span class="filter-label">Priority:</span>
+            <div class="filter-buttons" id="priorityFilters">
+                <button class="filter-btn active" data-filter="priority" data-value="All">All</button>
+                <button class="filter-btn" data-filter="priority" data-value="Low">Low</button>
+                <button class="filter-btn" data-filter="priority" data-value="Medium">Medium</button>
+                <button class="filter-btn" data-filter="priority" data-value="High">High</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==========================================
+         SEARCH
+    ========================================== -->
+
+    <div class="search-box">
+
+        <input id="search"
+               placeholder="Search task title..."
+               onkeyup="renderTasks()">
+
+    </div>
+
+    <!-- ==========================================
+         TASK TABLE
+    ========================================== -->
+
+    <div class="section table-wrapper">
+
+        <table>
+
+            <thead>
+
+                <tr>
+                    <th>ID</th>
+                    <th>Task</th>
+                    <th>Due Date</th>
+                    <th>Priority</th>
+                    <th>Status</th>
+                    <th>Hours</th>
+                    <th>Reward</th>
+                    <th>Actions</th>
+                </tr>
+
+            </thead>
+
+            <tbody id="taskTable"></tbody>
+
+        </table>
+
+    </div>
+
+    <!-- ==========================================
+         FOOTER
+    ========================================== -->
+    <footer class="app-footer">
+        <p>&copy; 2026 TaskFlow. Developed by Mark Russell Cosa. All rights reserved.</p>
+    </footer>
+
+</div>
+
+
+<!-- ==========================================
+     JAVASCRIPT FILES
+========================================== -->
+
+<!-- EDIT TASK MODAL -->
+<div id="modalOverlay" class="modal-overlay" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <header class="modal-header">
+            <h2 id="modalTitle">Edit Task</h2>
+            <button id="modalClose" class="modal-close" aria-label="Close modal">&times;</button>
+        </header>
+
+        <form id="modalForm" class="modal-body">
+
+            <div class="form-row">
+                <label>Task Title</label>
+                <input id="modalTitleInput" type="text" placeholder="Task Title" required>
+            </div>
+
+            <div class="form-row">
+                <label>Due Date</label>
+                <input id="modalDueDate" type="date">
+            </div>
+
+            <div class="form-row">
+                <label>Priority</label>
+                <select id="modalPriority">
+                    <option>Low</option>
+                    <option>Medium</option>
+                    <option>High</option>
+                </select>
+            </div>
+
+            <div class="form-row">
+                <label>Status</label>
+                <select id="modalStatus">
+                    <option>Pending</option>
+                    <option>Completed</option>
+                </select>
+            </div>
+
+            <div class="form-row">
+                <label>Estimated Hours</label>
+                <input id="modalEstimatedHours" type="number" min="0" placeholder="Estimated Hours">
+            </div>
+
+            <div class="form-row">
+                <label>Reward For Completion</label>
+                <input id="modalReward" type="text" placeholder="Reward For Completion">
+            </div>
+
+            <footer class="modal-actions">
+                <button type="button" id="modalCancel" class="btn-secondary">Cancel</button>
+                <button type="submit" id="modalSave" class="btn-primary">Save Changes</button>
+            </footer>
+
+        </form>
+
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="js/charts.js"></script>
+<script src="js/toast.js"></script>
+<script src="js/app.js"></script>
+<script src="js/modal.js"></script>
+
+
+
+</body>
+</html>
