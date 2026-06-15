@@ -101,25 +101,33 @@
             return;
         }
 
-        const payload = {
-            title: titleInput.value,
-            dueDate: dueDateInput.value || null,
-            priority: priorityInput.value,
-            status: statusInput.value,
-            estimatedHours: parseInt(estimatedInput.value) || 0,
-            rewardForCompletion: rewardInput.value
-        };
+        // Local Storage Update Logic
+        try {
+            // Ensure window.tasks is available and is an array
+            if (Array.isArray(window.tasks)) {
+                // Update the global tasks array
+                window.tasks = window.tasks.map(t => {
+                    if (t.id === id) {
+                        return {
+                            ...t,
+                            title: titleInput.value,
+                            dueDate: dueDateInput.value || null,
+                            priority: priorityInput.value,
+                            status: statusInput.value,
+                            estimatedHours: parseInt(estimatedInput.value) || 0,
+                            rewardForCompletion: rewardInput.value
+                        };
+                    }
+                    return t;
+                });
 
-        try{
-            const res = await fetch(`/tasks/${id}`,{
-                method:'PUT',
-                headers:{ 'Content-Type':'application/json' },
-                body: JSON.stringify(payload)
-            });
-
-            if(!res.ok){
-                const txt = await res.text();
-                throw new Error(txt || 'Update failed');
+                // Persist to Local Storage
+                if (typeof window.saveTasksToStorage === 'function') {
+                    window.saveTasksToStorage(window.tasks);
+                } else {
+                    console.error('saveTasksToStorage function not available globally.');
+                    throw new Error('Failed to save tasks to local storage.');
+                }
             }
 
             // success
@@ -128,8 +136,15 @@
             closeModal();
 
             // refresh tasks and UI
-            if(typeof loadTasks === 'function') loadTasks();
-
+            if(typeof window.refreshUI === 'function') {
+                window.refreshUI();
+            } else {
+                // Fallback if refreshUI is not globally available (shouldn't happen if app.js loads first)
+                if(typeof renderTasks === 'function') renderTasks();
+                if(typeof updateCards === 'function') updateCards();
+                if(typeof renderCharts === 'function') renderCharts();
+            }
+            
         }catch(err){
             console.error(err);
             if(typeof showToast === 'function') showToast(err.message || 'Update failed');

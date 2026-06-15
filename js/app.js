@@ -2,6 +2,10 @@
 // GLOBAL STATE
 // ==========================================
 
+/**
+ * STORAGE_KEY: The key used in Local Storage
+ */
+const STORAGE_KEY = 'taskflow_demo_tasks'; // Changed to a more specific key
 let tasks = [];
 // use window.currentEditId as the single source of truth for edit state
 window.currentEditId = window.currentEditId || null;
@@ -9,6 +13,27 @@ window.currentEditId = window.currentEditId || null;
 // Active Filter States
 let currentStatusFilter = 'All';
 let currentPriorityFilter = 'All';
+
+// ==========================================
+// LOCAL STORAGE HELPERS
+// ==========================================
+
+/**
+ * Retrieves tasks from Local Storage.
+ * @returns {Array} An array of task objects.
+ */
+function getTasksFromStorage() {
+    const storedData = localStorage.getItem(STORAGE_KEY);
+    return storedData ? JSON.parse(storedData) : [];
+}
+
+/**
+ * Saves the current tasks array to Local Storage.
+ * @param {Array} tasksArray - The array of task objects to save.
+ */
+function saveTasksToStorage(tasksArray) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(tasksArray));
+}
 
 // ==========================================
 // INITIALIZATION
@@ -44,186 +69,142 @@ function initFilters() {
 }
 
 // ==========================================
-// API FUNCTIONS
+// DATA & UI MANAGEMENT FUNCTIONS
 // ==========================================
 
-async function loadTasks() {
+/**
+ * Loads tasks from Local Storage or seeds demo data if empty.
+ * Then refreshes the UI.
+ */
+function loadTasks() {
+    tasks = getTasksFromStorage();
 
-    try {
+    if (tasks.length === 0) {
+        // Seed Demo Data for first-time users
+        const today = new Date();
+        const tomorrow = new Date(today);
+        tomorrow.setDate(today.getDate() + 1);
+        const yesterday = new Date(today);
+        yesterday.setDate(today.getDate() - 1);
 
-        const response = await fetch('/tasks');
-
-        if (!response.ok)
-            throw new Error('Failed to load tasks');
-
-        tasks = await response.json();
-
-        updateCards();
-
-        if (typeof renderCharts === "function") {
-            renderCharts();
-        }
-
-        renderTasks();
-
-    } catch (error) {
-
-        console.error(error);
-
-        if (typeof showToast === 'function')
-            showToast('Unable to load tasks');
+        tasks = [
+            { id: Date.now() + 1, title: 'Review Q3 Financial Report', description: 'Analyze revenue, expenses, and profit margins for the third quarter.', dueDate: today.toISOString().split('T')[0], priority: 'High', status: 'Pending', estimatedHours: 4, rewardForCompletion: 'Team Recognition' },
+            { id: Date.now() + 2, title: 'Update User Onboarding Flow', description: 'Refine the steps new users take to get started with TaskFlow.', dueDate: tomorrow.toISOString().split('T')[0], priority: 'Medium', status: 'Pending', estimatedHours: 6, rewardForCompletion: 'Free Coffee' },
+            { id: Date.now() + 3, title: 'Database Schema Refactoring', description: 'Optimize database tables and relationships for better performance.', dueDate: yesterday.toISOString().split('T')[0], priority: 'High', status: 'Pending', estimatedHours: 8, rewardForCompletion: 'Project Bonus' },
+            { id: Date.now() + 4, title: 'Prepare Marketing Campaign for Q4', description: 'Develop content and strategy for upcoming product features.', dueDate: new Date(today.getFullYear(), today.getMonth(), today.getDate() + 5).toISOString().split('T')[0], priority: 'Medium', status: 'Pending', estimatedHours: 5, rewardForCompletion: 'Extra PTO Day' },
+            { id: Date.now() + 5, title: 'Fix Mobile Responsiveness Bugs', description: 'Address layout and interaction issues on various mobile devices.', dueDate: new Date(today.getFullYear(), today.getMonth(), today.getDate() + 2).toISOString().split('T')[0], priority: 'Low', status: 'Completed', estimatedHours: 3, rewardForCompletion: 'User Satisfaction' },
+            { id: Date.now() + 6, title: 'Research AI Integration Options', description: 'Explore potential AI features for task automation and recommendations.', dueDate: new Date(today.getFullYear(), today.getMonth(), today.getDate() + 10).toISOString().split('T')[0], priority: 'High', status: 'Pending', estimatedHours: 10, rewardForCompletion: 'Innovation Award' }
+        ];
+        saveTasksToStorage(tasks);
     }
+
+    refreshUI();
 }
 
-async function addTask() {
+/**
+ * Refreshes all Dashboard components (KPIs, Charts, Task Table).
+ */
+function refreshUI() {
+    updateCards();
+    if (typeof renderCharts === "function") renderCharts();
+    renderTasks();
+}
 
+/**
+ * Handles Add and Update logic for tasks using Local Storage.
+ */
+function addTask() {
     const payload = getFormData();
 
+    // Validation
     if (!payload.title || payload.title.trim() === '') {
         if (typeof showToast === 'function') showToast('Please enter a task title');
         return;
     }
-
     if (!payload.dueDate) {
         if (typeof showToast === 'function') showToast('Please select a due date');
         return;
     }
-
-    if (!payload.estimatedHours || payload.estimatedHours <= 0) {
+    if (!payload.estimatedHours || parseInt(payload.estimatedHours) <= 0) { // Changed to parseInt for consistency
         if (typeof showToast === 'function') showToast('Please enter valid estimated hours');
         return;
     }
-
     if (!payload.rewardForCompletion || payload.rewardForCompletion.trim() === '') {
         if (typeof showToast === 'function') showToast('Please enter a reward');
         return;
     }
 
-    try {
+    let successMessage;
 
-        let response;
-        let successMessage;
-
-
-        if (window.currentEditId) {
-
-            response = await fetch(`/tasks/${window.currentEditId}`, {
-
-                method: 'PUT',
-
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-
-                body: JSON.stringify(payload)
-            });
-
-            successMessage = 'Task updated successfully';
-
-        } else {
-
-            response = await fetch('/tasks', {
-
-                method: 'POST',
-
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-
-                body: JSON.stringify(payload)
-            });
-
-            successMessage = 'Task added successfully';
-        }
-
-        if (!response.ok) {
-
-            const message = await response.text();
-
-            throw new Error(message);
-        }
-
-        window.currentEditId = null;
-
-        clearForm();
-
-        const addButton =
-            document.querySelector('.btn-primary');
-
-        if (addButton)
-            addButton.textContent = 'Add Task';
-
-        if (typeof showToast === 'function')
-            showToast(successMessage);
-
-        loadTasks();
-
-    } catch (error) {
-
-        if (typeof showToast === 'function')
-            showToast(error.message);
+    if (window.currentEditId) {
+        // Update Existing Task
+        tasks = tasks.map(t => t.id === window.currentEditId ? { ...payload, id: t.id } : t);
+        successMessage = 'Task updated successfully';
+    } else {
+        // Create New Task
+        const newTask = {
+            ...payload,
+            id: Date.now() // Unique ID generation
+        };
+        tasks.push(newTask);
+        successMessage = 'Task added successfully';
     }
+
+    saveTasksToStorage(tasks);
+    resetFormState(successMessage);
+    refreshUI();
 }
 
-async function deleteTask(id) {
+/**
+ * Removes a task from Local Storage.
+ * @param {number} id - The ID of the task to delete.
+ */
+function deleteTask(id) {
+    if (!confirm('Delete this task?')) return;
 
-    if (!confirm('Delete this task?'))
-        return;
+    tasks = tasks.filter(t => t.id !== id);
+    saveTasksToStorage(tasks);
 
-    try {
-
-        const response = await fetch(`/tasks/${id}`, {
-            method: 'DELETE'
-        });
-
-        if (!response.ok) {
-            throw new Error('Failed to delete task from server');
-        }
-
-        if (typeof showToast === 'function')
-            showToast('Task deleted successfully');
-
-        loadTasks();
-
-    } catch (error) {
-
-        console.error(error);
-
-        if (typeof showToast === 'function')
-            showToast('Delete failed');
-    }
+    if (typeof showToast === 'function') showToast('Task deleted successfully');
+    refreshUI();
 }
 
-async function toggleStatus(id) {
-
-    try {
-
-        const response = await fetch(`/tasks/${id}/toggle`, {
-            method: 'PATCH'
-        });
-
-        if (!response.ok) {
-            throw new Error('Failed to update status on server');
+/**
+ * Toggles a task's status in Local Storage.
+ * @param {number} id - The ID of the task to toggle.
+ */
+function toggleStatus(id) {
+    tasks = tasks.map(t => {
+        if (t.id === id) {
+            return { ...t, status: t.status === 'Completed' ? 'Pending' : 'Completed' };
         }
+        return t;
+    });
 
-        if (typeof showToast === 'function')
-            showToast('Status updated');
+    saveTasksToStorage(tasks);
+    if (typeof showToast === 'function') showToast('Status updated');
+    refreshUI();
+}
 
-        loadTasks();
+/**
+ * Resets the main task form UI state after an add/update operation.
+ * @param {string} message - The toast message to display.
+ */
+function resetFormState(message) {
+    window.currentEditId = null;
+    clearForm();
 
-    } catch (error) {
+    const addButton = document.querySelector('.btn-primary');
+    if (addButton) addButton.textContent = 'Add Task';
 
-        console.error(error);
-
-        if (typeof showToast === 'function')
-            showToast('Status update failed');
-    }
+    if (typeof showToast === 'function') showToast(message);
 }
 
 function logout() {
     if (typeof showToast === 'function')
-        showToast('Logging out...');
-    window.location.href = '/logout';
+        showToast('Logging out... (Demo version, no actual logout)'); // Updated message
+    // In a real app, you'd clear session/token here
+    // window.location.href = '/logout'; // Removed backend call
 }
 
 // ==========================================
@@ -231,43 +212,32 @@ function logout() {
 // ==========================================
 
 function getFormData() {
-
     return {
-
-        title:
-            document.getElementById('title').value,
-
-        dueDate:
-            document.getElementById('dueDate').value,
-
-        priority:
-            document.getElementById('priority').value,
-
-        status:
-            document.getElementById('status').value,
-
-        estimatedHours:
-            parseInt(
-                document.getElementById('estimatedHours').value
-            ) || 0,
-
-        rewardForCompletion:
-            document.getElementById('reward').value
+        title: document.getElementById('title').value,
+        dueDate: document.getElementById('dueDate').value,
+        priority: document.getElementById('priority').value,
+        status: document.getElementById('status').value,
+        estimatedHours: parseInt(document.getElementById('estimatedHours').value) || 0,
+        rewardForCompletion: document.getElementById('reward').value
     };
 }
 
 function clearForm() {
-
     document.getElementById('title').value = '';
     document.getElementById('dueDate').value = '';
     document.getElementById('priority').value = 'Medium';
     document.getElementById('status').value = 'Pending';
     document.getElementById('estimatedHours').value = '';
     document.getElementById('reward').value = '';
+    // Reset the "Add Task" button text if it was "Update Task"
+    const addButton = document.querySelector('.btn-primary');
+    if (addButton && addButton.textContent === 'Update Task') {
+        addButton.textContent = 'Add Task';
+    }
 }
 
 // ==========================================
-// DASHBOARD CARDS
+// DASHBOARD CARDS (KPIs)
 // ==========================================
 
 function updateCards() {
