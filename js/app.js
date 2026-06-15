@@ -329,18 +329,18 @@ function renderTasks() {
         html += `
         <tr>
 
-            <td>${task.id}</td>
+            <td data-label="ID">${task.id}</td>
 
-            <td>${task.title}</td>
+            <td data-label="Task">${task.title}</td>
 
-            <td>
+            <td data-label="Due Date">
                 ${new Date(task.dueDate)
                     .toLocaleDateString()}
             </td>
 
-            <td>${task.priority}</td>
+            <td data-label="Priority">${task.priority}</td>
 
-            <td>
+            <td data-label="Status">
 
                 <span
                     class="badge ${
@@ -357,20 +357,20 @@ function renderTasks() {
 
             </td>
 
-            <td>${task.estimatedHours}</td>
+            <td data-label="Hours">${task.estimatedHours}</td>
 
-            <td>${task.rewardForCompletion}</td>
+            <td data-label="Reward">${task.rewardForCompletion}</td>
 
-            <td>
+            <td class="actions-cell">
 
                 <button
-                    class="btn-primary"
+                    class="btn-primary btn-edit"
                     onclick="editTask(${task.id})">
                     Edit
                 </button>
 
                 <button
-                    class="btn-danger"
+                    class="btn-danger btn-delete"
                     onclick="deleteTask(${task.id})">
                     Delete
                 </button>
