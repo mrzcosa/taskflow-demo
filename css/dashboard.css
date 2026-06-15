@@ -10,15 +10,16 @@
     }
 
     :root{
-        --bg:#0f172a;
-        --card:#1e293b;
-        --input:#334155;
+        --bg: #020617;
+        --card: rgba(30, 41, 59, 0.45);
+        --input: rgba(51, 65, 85, 0.5);
         --primary:#3b82f6;
         --danger:#ef4444;
         --success:#22c55e;
         --warning:#f59e0b;
         --text:#ffffff;
         --muted:#94a3b8;
+        --border: rgba(255, 255, 255, 0.08);
     }
 
     /* ==========================================
