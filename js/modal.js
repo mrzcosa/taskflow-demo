@@ -72,7 +72,7 @@
     });
 
     // form submit - save changes via PUT
-    form.addEventListener('submit', async (e)=>{
+    form.addEventListener('submit', (e)=>{
         e.preventDefault();
 
         if (!titleInput.value || titleInput.value.trim() === '') {
@@ -110,29 +110,18 @@
             rewardForCompletion: rewardInput.value
         };
 
-        try{
-            const res = await fetch(`/tasks/${id}`,{
-                method:'PUT',
-                headers:{ 'Content-Type':'application/json' },
-                body: JSON.stringify(payload)
-            });
-
-            if(!res.ok){
-                const txt = await res.text();
-                throw new Error(txt || 'Update failed');
-            }
-
+        // Local Storage Update Logic
+        const index = tasks.findIndex(t => t.id === id);
+        if (index !== -1) {
+            tasks[index] = { ...tasks[index], ...payload };
+            
+            if (typeof saveTasks === 'function') saveTasks();
+            
             // success
             if(typeof showToast === 'function') showToast('Task updated successfully');
-
             closeModal();
-
             // refresh tasks and UI
             if(typeof loadTasks === 'function') loadTasks();
-
-        }catch(err){
-            console.error(err);
-            if(typeof showToast === 'function') showToast(err.message || 'Update failed');
         }
     });
 

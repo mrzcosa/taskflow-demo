@@ -2,6 +2,8 @@
 // GLOBAL STATE
 // ==========================================
 
+const STORAGE_KEY = "taskflow_tasks";
+const NOTIFICATION_STORAGE_KEY = 'taskflow_notifications';
 
 let tasks = [];
 // use window.currentEditId as the single source of truth for edit state
@@ -21,6 +23,35 @@ document.addEventListener('DOMContentLoaded', () => {
     initFilters();
     initNotificationBell();
 });
+
+/**
+ * Saves the tasks array to localStorage.
+ */
+function saveTasks() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+}
+
+/**
+ * Updates all dashboard UI components.
+ */
+function updateDashboard() {
+    updateCards();
+    if (typeof renderCharts === "function") {
+        renderCharts();
+    }
+    updateNotifications();
+    renderTasks();
+}
+
+/**
+ * Generates sample data for the demo.
+ */
+function getSampleTasks() {
+    return [
+        { id: 1, title: "Complete TaskFlow Demo", dueDate: new Date().toISOString().split('T')[0], priority: "High", status: "Pending", estimatedHours: 4, rewardForCompletion: "Coffee" },
+        { id: 2, title: "Explore Analytics", dueDate: new Date().toISOString().split('T')[0], priority: "Medium", status: "Completed", estimatedHours: 2, rewardForCompletion: "Insight" }
+    ];
+}
 
 /**
  * Setup event listeners for filter buttons
@@ -91,19 +122,18 @@ function toggleNotificationDropdown(forceOpen) {
 // API FUNCTIONS
 // ==========================================
 
-async function loadTasks() {
-
+function loadTasks() {
     try {
-
         loadNotifications(); // Load existing notifications at the start
-        const response = await fetch('/tasks');
-
-        if (!response.ok)
-            throw new Error('Failed to load tasks');
-
-        tasks = await response.json();
-
-        updateCards();
+        
+        const storedTasks = localStorage.getItem(STORAGE_KEY);
+        if (storedTasks) {
+            tasks = JSON.parse(storedTasks);
+        } else {
+            // Initialize with sample data for first-time demo users
+            tasks = getSampleTasks();
+            saveTasks();
+        }
 
         const now = new Date();
         now.setHours(0, 0, 0, 0);
@@ -127,14 +157,9 @@ async function loadTasks() {
             }
         });
 
-        if (typeof renderCharts === "function") {
-            renderCharts();
-        }
-        updateNotifications(); // Update notifications after tasks are loaded
-        renderTasks();
-
+        updateDashboard();
+        
     } catch (error) {
-
         console.error(error);
 
         if (typeof showToast === 'function')
@@ -142,8 +167,7 @@ async function loadTasks() {
     }
 }
 
-async function addTask() {
-
+function addTask() {
     const payload = getFormData();
 
     if (!payload.title || payload.title.trim() === '') {
@@ -166,49 +190,25 @@ async function addTask() {
         return;
     }
 
+    const isNewTask = !window.currentEditId;
+    let returnedTask;
+
+    if (!isNewTask) {
+        // Update existing task
+        const index = tasks.findIndex(t => t.id === window.currentEditId);
+        if (index !== -1) {
+            tasks[index] = { ...tasks[index], ...payload };
+            returnedTask = tasks[index];
+        }
+    } else {
+        // Create new task with local ID generation
+        const newId = tasks.length > 0 ? Math.max(...tasks.map(t => t.id)) + 1 : 1;
+        returnedTask = { id: newId, ...payload };
+        tasks.push(returnedTask);
+    }
+
     try {
-
-        let response;
-        const isNewTask = !window.currentEditId;
-        let returnedTask;
-
-
-        if (window.currentEditId) {
-
-            response = await fetch(`/tasks/${window.currentEditId}`, {
-
-                method: 'PUT',
-
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-
-                body: JSON.stringify(payload)
-            });
-
-            returnedTask = await response.json(); // Assume API returns the updated task
-
-        } else {
-
-            response = await fetch('/tasks', {
-
-                method: 'POST',
-
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-
-                body: JSON.stringify(payload)
-            });
-
-            returnedTask = await response.json(); // Assume API returns the created task
-        }
-
-        if (!response.ok) {
-
-            const message = await response.text();
-            throw new Error(message);
-        }
+        saveTasks();
 
         window.currentEditId = null;
         clearForm();
@@ -538,7 +538,8 @@ function editTask(id) {
 // NOTIFICATIONS
 // ==========================================
 
-const NOTIFICATION_STORAGE_KEY = 'taskFlowNotifications';
+window.saveTasks = saveTasks;
+window.loadTasks = loadTasks;
 
 /**
  * Saves the current notifications array to localStorage.
