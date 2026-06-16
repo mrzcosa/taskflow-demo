@@ -94,10 +94,26 @@
 
     <div class="header">
         <div class="header-top">
-            <button id="mobileMenuBtn" class="mobile-toggle-btn" aria-label="Toggle Menu">
+            <button id="menuToggle" class="menu-toggle" aria-label="Toggle Menu">
                 <i class="fa-solid fa-bars"></i>
             </button>
             <h1>DASHBOARD</h1>
+            <button id="notificationBell" class="notification-bell" aria-label="Notifications" aria-haspopup="true" aria-expanded="false">
+                <i class="fa-solid fa-bell"></i>
+                <span id="notificationDot" class="notification-dot hidden"></span>
+            </button>
+            <div id="notificationDropdown" class="notification-dropdown" aria-hidden="true">
+                <div class="notification-header">
+                    <h3>Notifications <span id="notificationCount" class="notification-count-badge"></span></h3>
+                </div>
+                <div id="notificationList" class="notification-list">
+                    <!-- Notifications will be loaded here -->
+                </div>
+                <div class="notification-actions">
+                    <button class="btn-text" onclick="markAllNotificationsAsRead()">Mark All as Read</button>
+                    <button class="btn-text btn-clear" onclick="clearAllNotifications()">Clear All</button>
+                </div>
+            </div>
         </div>
         <p class="header-subtitle">Organize. Prioritize. Get things done.</p>
     </div>
@@ -125,7 +141,7 @@
         </div>
 
         <div class="card kpi-card">
-            <div class="kpi-icon green"><i class="fa-solid fa-check-double"></i></div>
+            <div class="kpi-icon green"><i class="fa-solid fa-check"></i></div>
             <div class="kpi-content">
                 <h3>Completed</h3>
                 <h2 id="completedTasks">0</h2>

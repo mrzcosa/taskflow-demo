@@ -4,20 +4,27 @@ document.addEventListener('DOMContentLoaded', () => {
     const views = document.querySelectorAll('.content-view');
     const sidebar = document.getElementById('sidebar');
     const overlay = document.getElementById('sidebarOverlay');
-    const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+    const menuToggle = document.getElementById('menuToggle');
 
-    function toggleMobileSidebar() {
-        sidebar.classList.toggle('mobile-open');
-        overlay.classList.toggle('active');
+    function openSidebar() {
+        sidebar.classList.add('active');
+        overlay.classList.add('active');
+        document.body.style.overflow = 'hidden'; // Prevent scrolling when open
     }
 
-    function closeMobileSidebar() {
-        sidebar.classList.remove('mobile-open');
+    function closeSidebar() {
+        sidebar.classList.remove('active');
         overlay.classList.remove('active');
+        document.body.style.overflow = '';
     }
 
-    if (mobileMenuBtn) mobileMenuBtn.addEventListener('click', toggleMobileSidebar);
-    if (overlay) overlay.addEventListener('click', closeMobileSidebar);
+    function toggleSidebar() {
+        sidebar.classList.contains('active') ? closeSidebar() : openSidebar();
+    }
+
+    if (menuToggle) menuToggle.addEventListener('click', toggleSidebar);
+    // Close sidebar when clicking overlay OR any menu item on mobile
+    if (overlay) overlay.addEventListener('click', closeSidebar);
 
     /**
      * Switch between dashboard views
@@ -52,7 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Close sidebar on mobile after selection
-        if (window.innerWidth <= 768) closeMobileSidebar();
+        if (window.innerWidth <= 991) closeSidebar();
     }
 
     // Add Click Listeners to Menu Items

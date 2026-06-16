@@ -29,12 +29,12 @@
 
 .modal{
     width:100%;
-    max-width: clamp(320px, 95vw, 720px);
+    max-width:720px;
     background:var(--modal-card);
     border:1px solid var(--modal-border);
     backdrop-filter: blur(var(--glass-blur)) saturate(120%);
     border-radius:12px;
-    box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    box-shadow:0 12px 40px rgba(2,6,23,0.6);
     transform-origin:center center;
     transform:translateY(-6px) scale(.998);
     opacity:0;

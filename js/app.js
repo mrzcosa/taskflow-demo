@@ -2,38 +2,15 @@
 // GLOBAL STATE
 // ==========================================
 
-/**
- * STORAGE_KEY: The key used in Local Storage
- */
-const STORAGE_KEY = 'taskflow_demo_tasks'; // Changed to a more specific key
+
 let tasks = [];
 // use window.currentEditId as the single source of truth for edit state
 window.currentEditId = window.currentEditId || null;
 
 // Active Filter States
 let currentStatusFilter = 'All';
+let notifications = []; // Global array for notifications
 let currentPriorityFilter = 'All';
-
-// ==========================================
-// LOCAL STORAGE HELPERS
-// ==========================================
-
-/**
- * Retrieves tasks from Local Storage.
- * @returns {Array} An array of task objects.
- */
-function getTasksFromStorage() {
-    const storedData = localStorage.getItem(STORAGE_KEY);
-    return storedData ? JSON.parse(storedData) : [];
-}
-
-/**
- * Saves the current tasks array to Local Storage.
- * @param {Array} tasksArray - The array of task objects to save.
- */
-function saveTasksToStorage(tasksArray) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(tasksArray));
-}
 
 // ==========================================
 // INITIALIZATION
@@ -42,6 +19,7 @@ function saveTasksToStorage(tasksArray) {
 document.addEventListener('DOMContentLoaded', () => {
     loadTasks();
     initFilters();
+    initNotificationBell();
 });
 
 /**
@@ -68,143 +46,260 @@ function initFilters() {
     });
 }
 
-// ==========================================
-// DATA & UI MANAGEMENT FUNCTIONS
-// ==========================================
-
 /**
- * Loads tasks from Local Storage or seeds demo data if empty.
- * Then refreshes the UI.
+ * Initializes the notification bell functionality.
  */
-function loadTasks() {
-    tasks = getTasksFromStorage();
+function initNotificationBell() {
+    const notificationBell = document.getElementById('notificationBell');
+    const notificationDropdown = document.getElementById('notificationDropdown');
 
-    if (tasks.length === 0) {
-        // Seed Demo Data for first-time users
-        const today = new Date();
-        const tomorrow = new Date(today);
-        tomorrow.setDate(today.getDate() + 1);
-        const yesterday = new Date(today);
-        yesterday.setDate(today.getDate() - 1);
+    if (notificationBell && notificationDropdown) {
+        notificationBell.addEventListener('click', (event) => {
+            event.stopPropagation(); // Prevent click from immediately closing dropdown
+            toggleNotificationDropdown();
+        });
 
-        tasks = [
-            { id: Date.now() + 1, title: 'Review Q3 Financial Report', description: 'Analyze revenue, expenses, and profit margins for the third quarter.', dueDate: today.toISOString().split('T')[0], priority: 'High', status: 'Pending', estimatedHours: 4, rewardForCompletion: 'Team Recognition' },
-            { id: Date.now() + 2, title: 'Update User Onboarding Flow', description: 'Refine the steps new users take to get started with TaskFlow.', dueDate: tomorrow.toISOString().split('T')[0], priority: 'Medium', status: 'Pending', estimatedHours: 6, rewardForCompletion: 'Free Coffee' },
-            { id: Date.now() + 3, title: 'Database Schema Refactoring', description: 'Optimize database tables and relationships for better performance.', dueDate: yesterday.toISOString().split('T')[0], priority: 'High', status: 'Pending', estimatedHours: 8, rewardForCompletion: 'Project Bonus' },
-            { id: Date.now() + 4, title: 'Prepare Marketing Campaign for Q4', description: 'Develop content and strategy for upcoming product features.', dueDate: new Date(today.getFullYear(), today.getMonth(), today.getDate() + 5).toISOString().split('T')[0], priority: 'Medium', status: 'Pending', estimatedHours: 5, rewardForCompletion: 'Extra PTO Day' },
-            { id: Date.now() + 5, title: 'Fix Mobile Responsiveness Bugs', description: 'Address layout and interaction issues on various mobile devices.', dueDate: new Date(today.getFullYear(), today.getMonth(), today.getDate() + 2).toISOString().split('T')[0], priority: 'Low', status: 'Completed', estimatedHours: 3, rewardForCompletion: 'User Satisfaction' },
-            { id: Date.now() + 6, title: 'Research AI Integration Options', description: 'Explore potential AI features for task automation and recommendations.', dueDate: new Date(today.getFullYear(), today.getMonth(), today.getDate() + 10).toISOString().split('T')[0], priority: 'High', status: 'Pending', estimatedHours: 10, rewardForCompletion: 'Innovation Award' }
-        ];
-        saveTasksToStorage(tasks);
+        // Close dropdown if clicked outside
+        document.addEventListener('click', (event) => {
+            if (!notificationDropdown.contains(event.target) && !notificationBell.contains(event.target) && notificationDropdown.classList.contains('open')) {
+                toggleNotificationDropdown(false);
+            }
+        });
     }
-
-    refreshUI();
 }
 
 /**
- * Refreshes all Dashboard components (KPIs, Charts, Task Table).
+ * Toggles the visibility of the notification dropdown.
+ * @param {boolean} [forceOpen] - Optional. If true, forces dropdown open. If false, forces dropdown closed.
  */
-function refreshUI() {
-    updateCards();
-    if (typeof renderCharts === "function") renderCharts();
-    renderTasks();
+function toggleNotificationDropdown(forceOpen) {
+    const notificationDropdown = document.getElementById('notificationDropdown');
+    const notificationBell = document.getElementById('notificationBell');
+
+    if (!notificationDropdown || !notificationBell) return;
+
+    const isOpen = notificationDropdown.classList.contains('open');
+    const shouldOpen = forceOpen === undefined ? !isOpen : forceOpen;
+
+    notificationDropdown.classList.toggle('open', shouldOpen);
+    notificationBell.setAttribute('aria-expanded', shouldOpen);
+    notificationDropdown.setAttribute('aria-hidden', !shouldOpen);
 }
 
-/**
- * Handles Add and Update logic for tasks using Local Storage.
- */
-function addTask() {
+
+// ==========================================
+// API FUNCTIONS
+// ==========================================
+
+async function loadTasks() {
+
+    try {
+
+        loadNotifications(); // Load existing notifications at the start
+        const response = await fetch('/tasks');
+
+        if (!response.ok)
+            throw new Error('Failed to load tasks');
+
+        tasks = await response.json();
+
+        updateCards();
+
+        const now = new Date();
+        now.setHours(0, 0, 0, 0);
+
+        // Generate notifications for overdue, due today, and high priority tasks
+        tasks.forEach(task => {
+            const taskDate = new Date(task.dueDate);
+            taskDate.setHours(0, 0, 0, 0);
+
+            // Overdue notifications (if not completed)
+            if (task.status !== 'Completed' && taskDate < now) {
+                generateNotification('overdue', task);
+            }
+            // Due Today notifications (if not completed)
+            if (task.status !== 'Completed' && taskDate.getTime() === now.getTime()) {
+                generateNotification('dueToday', task);
+            }
+            // High Priority notifications (if not completed)
+            if (task.priority === 'High' && task.status !== 'Completed') {
+                generateNotification('highPriority', task);
+            }
+        });
+
+        if (typeof renderCharts === "function") {
+            renderCharts();
+        }
+        updateNotifications(); // Update notifications after tasks are loaded
+        renderTasks();
+
+    } catch (error) {
+
+        console.error(error);
+
+        if (typeof showToast === 'function')
+            showToast('Unable to load tasks');
+    }
+}
+
+async function addTask() {
+
     const payload = getFormData();
 
-    // Validation
     if (!payload.title || payload.title.trim() === '') {
         if (typeof showToast === 'function') showToast('Please enter a task title');
         return;
     }
+
     if (!payload.dueDate) {
         if (typeof showToast === 'function') showToast('Please select a due date');
         return;
     }
-    if (!payload.estimatedHours || parseInt(payload.estimatedHours) <= 0) { // Changed to parseInt for consistency
+
+    if (!payload.estimatedHours || payload.estimatedHours <= 0) {
         if (typeof showToast === 'function') showToast('Please enter valid estimated hours');
         return;
     }
+
     if (!payload.rewardForCompletion || payload.rewardForCompletion.trim() === '') {
         if (typeof showToast === 'function') showToast('Please enter a reward');
         return;
     }
 
-    let successMessage;
+    try {
 
-    if (window.currentEditId) {
-        // Update Existing Task
-        tasks = tasks.map(t => t.id === window.currentEditId ? { ...payload, id: t.id } : t);
-        successMessage = 'Task updated successfully';
-    } else {
-        // Create New Task
-        const newTask = {
-            ...payload,
-            id: Date.now() // Unique ID generation
-        };
-        tasks.push(newTask);
-        successMessage = 'Task added successfully';
-    }
+        let response;
+        const isNewTask = !window.currentEditId;
+        let returnedTask;
 
-    saveTasksToStorage(tasks);
-    resetFormState(successMessage);
-    refreshUI();
-}
 
-/**
- * Removes a task from Local Storage.
- * @param {number} id - The ID of the task to delete.
- */
-function deleteTask(id) {
-    if (!confirm('Delete this task?')) return;
+        if (window.currentEditId) {
 
-    tasks = tasks.filter(t => t.id !== id);
-    saveTasksToStorage(tasks);
+            response = await fetch(`/tasks/${window.currentEditId}`, {
 
-    if (typeof showToast === 'function') showToast('Task deleted successfully');
-    refreshUI();
-}
+                method: 'PUT',
 
-/**
- * Toggles a task's status in Local Storage.
- * @param {number} id - The ID of the task to toggle.
- */
-function toggleStatus(id) {
-    tasks = tasks.map(t => {
-        if (t.id === id) {
-            return { ...t, status: t.status === 'Completed' ? 'Pending' : 'Completed' };
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+
+                body: JSON.stringify(payload)
+            });
+
+            returnedTask = await response.json(); // Assume API returns the updated task
+
+        } else {
+
+            response = await fetch('/tasks', {
+
+                method: 'POST',
+
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+
+                body: JSON.stringify(payload)
+            });
+
+            returnedTask = await response.json(); // Assume API returns the created task
         }
-        return t;
-    });
 
-    saveTasksToStorage(tasks);
-    if (typeof showToast === 'function') showToast('Status updated');
-    refreshUI();
+        if (!response.ok) {
+
+            const message = await response.text();
+            throw new Error(message);
+        }
+
+        window.currentEditId = null;
+        clearForm();
+
+        const addButton =
+            document.querySelector('.btn-primary');
+
+        if (addButton)
+            addButton.textContent = 'Add Task';
+
+        if (typeof showToast === 'function')
+            showToast(isNewTask ? 'Task added successfully' : 'Task updated successfully');
+
+        // Generate notifications based on the action
+        if (isNewTask) {
+            generateNotification('created', returnedTask);
+        }
+        // High priority notification (for new or updated tasks)
+        // Overdue/Due Today notifications are handled by loadTasks()
+        if (returnedTask.priority === 'High' && returnedTask.status !== 'Completed') {
+            generateNotification('highPriority', returnedTask);
+        }
+
+        loadTasks();
+
+    } catch (error) {
+
+        if (typeof showToast === 'function')
+            showToast(error.message);
+    }
 }
 
-/**
- * Resets the main task form UI state after an add/update operation.
- * @param {string} message - The toast message to display.
- */
-function resetFormState(message) {
-    window.currentEditId = null;
-    clearForm();
+async function deleteTask(id) {
 
-    const addButton = document.querySelector('.btn-primary');
-    if (addButton) addButton.textContent = 'Add Task';
+    if (!confirm('Delete this task?'))
+        return;
 
-    if (typeof showToast === 'function') showToast(message);
+    try {
+
+        const response = await fetch(`/tasks/${id}`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to delete task from server');
+        }
+
+        if (typeof showToast === 'function')
+            showToast('Task deleted successfully');
+
+        loadTasks();
+
+    } catch (error) {
+
+        console.error(error);
+
+        if (typeof showToast === 'function')
+            showToast('Delete failed');
+    }
+}
+
+async function toggleStatus(id) {
+
+    try {
+
+        const response = await fetch(`/tasks/${id}/toggle`, {
+            method: 'PATCH'
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to update status on server');
+        }
+
+        if (typeof showToast === 'function')
+            showToast('Status updated');
+
+        loadTasks();
+
+    } catch (error) {
+
+        console.error(error);
+
+        if (typeof showToast === 'function')
+            showToast('Status update failed');
+    }
 }
 
 function logout() {
     if (typeof showToast === 'function')
-        showToast('Logging out... (Demo version, no actual logout)'); // Updated message
-    // In a real app, you'd clear session/token here
-    // window.location.href = '/logout'; // Removed backend call
+        showToast('Logging out...');
+    window.location.href = '/logout';
 }
 
 // ==========================================
@@ -212,32 +307,43 @@ function logout() {
 // ==========================================
 
 function getFormData() {
+
     return {
-        title: document.getElementById('title').value,
-        dueDate: document.getElementById('dueDate').value,
-        priority: document.getElementById('priority').value,
-        status: document.getElementById('status').value,
-        estimatedHours: parseInt(document.getElementById('estimatedHours').value) || 0,
-        rewardForCompletion: document.getElementById('reward').value
+
+        title:
+            document.getElementById('title').value,
+
+        dueDate:
+            document.getElementById('dueDate').value,
+
+        priority:
+            document.getElementById('priority').value,
+
+        status:
+            document.getElementById('status').value,
+
+        estimatedHours:
+            parseInt(
+                document.getElementById('estimatedHours').value
+            ) || 0,
+
+        rewardForCompletion:
+            document.getElementById('reward').value
     };
 }
 
 function clearForm() {
+
     document.getElementById('title').value = '';
     document.getElementById('dueDate').value = '';
     document.getElementById('priority').value = 'Medium';
     document.getElementById('status').value = 'Pending';
     document.getElementById('estimatedHours').value = '';
     document.getElementById('reward').value = '';
-    // Reset the "Add Task" button text if it was "Update Task"
-    const addButton = document.querySelector('.btn-primary');
-    if (addButton && addButton.textContent === 'Update Task') {
-        addButton.textContent = 'Add Task';
-    }
 }
 
 // ==========================================
-// DASHBOARD CARDS (KPIs)
+// DASHBOARD CARDS
 // ==========================================
 
 function updateCards() {
@@ -298,6 +404,7 @@ function updateCards() {
     if (overdueCard) {
         counts.overdue > 0 ? overdueCard.classList.add('is-overdue') : overdueCard.classList.remove('is-overdue');
     }
+    return counts; // Return counts for use in notifications
 }
 
 // ==========================================
@@ -324,23 +431,34 @@ function renderTasks() {
 
     let html = '';
 
+    if (filteredTasks.length === 0) {
+        html = `
+            <tr class="empty-state">
+                <td colspan="8">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <strong>No matching tasks found</strong>
+                    <br>
+                    <small style="opacity: 0.7;">Try adjusting your search or filters.</small>
+                </td>
+            </tr>`;
+    } else {
     filteredTasks.forEach(task => {
 
         html += `
         <tr>
 
-            <td data-label="ID">${task.id}</td>
+            <td>${task.id}</td>
 
-            <td data-label="Task">${task.title}</td>
+            <td>${task.title}</td>
 
-            <td data-label="Due Date">
+            <td>
                 ${new Date(task.dueDate)
                     .toLocaleDateString()}
             </td>
 
-            <td data-label="Priority">${task.priority}</td>
+            <td>${task.priority}</td>
 
-            <td data-label="Status">
+            <td>
 
                 <span
                     class="badge ${
@@ -357,20 +475,20 @@ function renderTasks() {
 
             </td>
 
-            <td data-label="Hours">${task.estimatedHours}</td>
+            <td>${task.estimatedHours}</td>
 
-            <td data-label="Reward">${task.rewardForCompletion}</td>
+            <td>${task.rewardForCompletion}</td>
 
-            <td class="actions-cell">
+            <td>
 
                 <button
-                    class="btn-primary btn-edit"
+                    class="btn-primary"
                     onclick="editTask(${task.id})">
                     Edit
                 </button>
 
                 <button
-                    class="btn-danger btn-delete"
+                    class="btn-danger"
                     onclick="deleteTask(${task.id})">
                     Delete
                 </button>
@@ -379,6 +497,7 @@ function renderTasks() {
 
         </tr>`;
     });
+    }
 
     document.getElementById('taskTable').innerHTML =
         html;
@@ -413,4 +532,208 @@ function editTask(id) {
     window.currentEditId = id;
     const addButton = document.querySelector('.btn-primary');
     if (addButton) addButton.textContent = 'Update Task';
+}
+
+// ==========================================
+// NOTIFICATIONS
+// ==========================================
+
+const NOTIFICATION_STORAGE_KEY = 'taskFlowNotifications';
+
+/**
+ * Saves the current notifications array to localStorage.
+ */
+function saveNotifications() {
+    localStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify(notifications));
+}
+
+/**
+ * Loads notifications from localStorage.
+ */
+function loadNotifications() {
+    const storedNotifications = localStorage.getItem(NOTIFICATION_STORAGE_KEY);
+    notifications = storedNotifications ? JSON.parse(storedNotifications) : [];
+}
+
+/**
+ * Formats a timestamp into a human-readable "X time ago" string.
+ * @param {number} timestamp - The timestamp in milliseconds.
+ * @returns {string} The formatted time string.
+ */
+function formatTimeAgo(timestamp) {
+    const now = Date.now();
+    const seconds = Math.floor((now - timestamp) / 1000);
+
+    if (seconds < 60) return `${seconds} seconds ago`;
+
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes} minutes ago`;
+
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours} hours ago`;
+
+    const days = Math.floor(hours / 24);
+    if (days < 7) return `${days} days ago`;
+
+    const weeks = Math.floor(days / 7);
+    if (weeks < 4) return `${weeks} weeks ago`;
+
+    const months = Math.floor(days / 30);
+    if (months < 12) return `${months} months ago`;
+
+    const years = Math.floor(days / 365);
+    return `${years} years ago`;
+}
+
+/**
+ * Checks if a notification of a specific type for a specific task already exists and is unread.
+ * @param {string} type - The type of notification (e.g., 'overdue', 'dueToday').
+ * @param {number} taskId - The ID of the task.
+ * @returns {boolean} True if an unread notification of this type for this task exists, false otherwise.
+ */
+function notificationExists(type, taskId) {
+    return notifications.some(n => n.type === type && n.taskId === taskId && !n.read);
+}
+
+/**
+ * Generates and adds a new notification.
+ * @param {string} type - The type of notification ('overdue', 'dueToday', 'completed', 'highPriority', 'created').
+ * @param {object} task - The task object related to the notification.
+ */
+function generateNotification(type, task) {
+    if (!task || !task.id) return;
+
+    // Prevent duplicate unread notifications for certain types
+    if (notificationExists(type, task.id)) {
+        return;
+    }
+
+    let message = '';
+    switch (type) {
+        case 'overdue':
+            message = `Task '${task.title}' is overdue.`;
+            break;
+        case 'dueToday':
+            message = `Task '${task.title}' is due today.`;
+            break;
+        case 'completed':
+            message = `Task '${task.title}' was completed.`;
+            break;
+        case 'highPriority':
+            message = `High priority task '${task.title}' requires attention.`;
+            break;
+        case 'created':
+            message = `New task '${task.title}' has been created.`;
+            break;
+        default:
+            message = `New notification for task '${task.title}'.`;
+    }
+
+    const newNotification = {
+        id: Date.now() + Math.random().toString(36).substring(2, 9), // Unique ID
+        taskId: task.id,
+        type: type,
+        message: message,
+        timestamp: Date.now(),
+        read: false
+    };
+
+    notifications.unshift(newNotification); // Add to the beginning
+    saveNotifications();
+    updateNotifications();
+}
+
+/**
+ * Updates the notification dropdown and badge.
+ */
+function updateNotifications() {
+    const notificationList = document.getElementById('notificationList');
+    const notificationDot = document.getElementById('notificationDot');
+    const notificationCountElement = document.getElementById('notificationCount');
+
+    if (!notificationList || !notificationDot || !notificationCountElement) return;
+
+    const unreadNotifications = notifications.filter(n => !n.read);
+    const unreadCount = unreadNotifications.length;
+
+    let notificationsHtml = '';
+    if (notifications.length === 0) {
+        notificationsHtml = '<div class="notification-item">No notifications.</div>';
+    } else {
+        notifications.forEach(n => {
+            let iconClass = 'fa-circle-info';
+            let iconColor = 'var(--primary)';
+
+            if (n.type === 'overdue') { iconClass = 'fa-circle-exclamation'; iconColor = 'var(--danger)'; }
+            else if (n.type === 'dueToday') { iconClass = 'fa-calendar-day'; iconColor = 'var(--warning)'; }
+            else if (n.type === 'completed') { iconClass = 'fa-circle-check'; iconColor = 'var(--success)'; }
+            else if (n.type === 'highPriority') { iconClass = 'fa-triangle-exclamation'; iconColor = 'var(--danger)'; }
+            else if (n.type === 'created') { iconClass = 'fa-circle-plus'; iconColor = 'var(--primary)'; }
+
+            notificationsHtml += `
+                <div class="notification-item ${n.read ? '' : 'unread'}">
+                    <div class="notif-icon-wrapper" style="color: ${iconColor}">
+                        <i class="fa-solid ${iconClass}"></i>
+                    </div>
+                    <div class="notification-content">
+                        <div class="notif-message" onclick="editTask(${n.taskId}); markNotificationAsRead('${n.id}'); toggleNotificationDropdown(false);">
+                            ${n.message}
+                        </div>
+                        <div class="notification-meta-actions">
+                            <span class="notif-timestamp">${formatTimeAgo(n.timestamp)}</span>
+                            <div class="notif-item-btns">
+                                ${!n.read ? `
+                                    <button class="btn-notif-action success" title="Mark as Read" onclick="markNotificationAsRead('${n.id}')">
+                                        <i class="fa-solid fa-check"></i>
+                                    </button>` : ''}
+                                <button class="btn-notif-action danger" title="Delete" onclick="clearNotification('${n.id}')">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    notificationList.innerHTML = notificationsHtml;
+    notificationCountElement.textContent = unreadCount > 0 ? `[${unreadCount}]` : '';
+    
+    updateNotificationDot();
+}
+
+/**
+ * Specifically handles the visibility of the red dot indicator.
+ */
+function updateNotificationDot() {
+    const dot = document.getElementById('notificationDot');
+    if (!dot) return;
+    const unreadCount = notifications.filter(n => !n.read).length;
+    dot.classList.toggle('hidden', unreadCount === 0);
+}
+
+function markNotificationAsRead(id) {
+    const notification = notifications.find(n => n.id === id);
+    if (notification) notification.read = true;
+    saveNotifications();
+    updateNotifications();
+}
+
+function clearNotification(id) {
+    notifications = notifications.filter(n => n.id !== id);
+    saveNotifications();
+    updateNotifications();
+}
+
+function markAllNotificationsAsRead() {
+    notifications.forEach(n => n.read = true);
+    saveNotifications();
+    updateNotifications();
+}
+
+function clearAllNotifications() {
+    notifications = [];
+    saveNotifications();
+    updateNotifications();
 }
