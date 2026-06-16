@@ -6,6 +6,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const overlay = document.getElementById('sidebarOverlay');
     const menuToggle = document.getElementById('menuToggle');
 
+    if (!sidebar || !overlay || !menuToggle) return;
+
     function openSidebar() {
         sidebar.classList.add('active');
         overlay.classList.add('active');
@@ -22,9 +24,10 @@ document.addEventListener('DOMContentLoaded', () => {
         sidebar.classList.contains('active') ? closeSidebar() : openSidebar();
     }
 
-    if (menuToggle) menuToggle.addEventListener('click', toggleSidebar);
+    menuToggle.addEventListener('click', toggleSidebar);
+    
     // Close sidebar when clicking overlay OR any menu item on mobile
-    if (overlay) overlay.addEventListener('click', closeSidebar);
+    overlay.addEventListener('click', closeSidebar);
 
     /**
      * Switch between dashboard views
@@ -73,6 +76,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     });
+
+    // Close sidebar when clicking menu items on mobile
+    menuItems.forEach(item => item.addEventListener('click', () => {
+        if (window.innerWidth <= 991) closeSidebar();
+    }));
 
     // Export navigation globally if needed
     window.taskFlowNavigate = navigateTo;
